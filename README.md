@@ -1,5 +1,3 @@
-### French
-
 # AppCrate
 
 **Check your applications, click Install.** AppCrate is a small Windows installer in one 4.exe': it displays a catalog of popular applications, you check the cells you want, and it installs them all silently using [winget](https://learn.microsoft.com/windows/package-manager/).
@@ -41,14 +39,6 @@ app.identifiant.winget=Short description
 '''
 
 The identifier is with 'winget search name'. The website is only used to preserve the logo.
-
-## Add a language
-
-1. Copy 'lang/en.txt' to 'qulang/xx.txt' ('xx' = language code, e.g. 'nl', 'pl', 'tr')
-2. Change the line angname=' (name displayed, in the language itself) and translate the values
-3. Relaunch 'Cbuild.bat': the language belongs to the list by itself
-
-Texts bring automation back to English.
 
 ## Logos and brands
 
