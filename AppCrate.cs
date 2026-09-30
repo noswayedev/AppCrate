@@ -6,6 +6,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -14,70 +15,99 @@ using System.Windows.Forms;
 // Interface moderne dessinee a la main (WinForms). Compatible C# 5 (csc.exe integre a Windows).
 
 // =====================================================================
-//  Langues (francais / anglais)
+//  Langues : fichiers lang\xx.txt integres dans l'exe (format cle=valeur)
 // =====================================================================
+static class AppInfo
+{
+    public const string Version = "1.3";
+}
+
 static class L
 {
-    public static string Lang =
-        System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "fr" ? "fr" : "en";
-
-    static readonly Dictionary<string, string[]> T = new Dictionary<string, string[]>();
-
-    static void Add(string key, string fr, string en) { T[key] = new string[] { fr, en }; }
+    static readonly Dictionary<string, Dictionary<string, string>> data = new Dictionary<string, Dictionary<string, string>>();
+    static readonly List<string> codes = new List<string>();
+    static Dictionary<string, string> cur = new Dictionary<string, string>();
+    static Dictionary<string, string> fallback = new Dictionary<string, string>();
+    static string lang = "en";
 
     static L()
     {
-        Add("subtitle", "Coche tes applications, clique sur Installer : tout se fait en silence.",
-                        "Tick your apps, click Install: everything runs silently.");
-        Add("categories", "CATÉGORIES", "CATEGORIES");
-        Add("all_apps", "Toutes les applications", "All applications");
-        Add("select_all", "Tout cocher", "Select all");
-        Add("deselect_all", "Tout décocher", "Deselect all");
-        Add("details", "Détails", "Details");
-        Add("settings", "Paramètres", "Settings");
-        Add("install", "Installer", "Install");
-        Add("install_n", "Installer ({0})", "Install ({0})");
-        Add("cancel", "Annuler", "Cancel");
-        Add("sel_one", "{0} application sélectionnée", "{0} app selected");
-        Add("sel_many", "{0} applications sélectionnées", "{0} apps selected");
-        Add("ready", "Prêt.", "Ready.");
-        Add("none_checked", "Aucune application cochée.", "No app selected.");
-        Add("cancelling", "Annulation après l'application en cours...", "Cancelling after the current app...");
-        Add("installing_now", "({0}/{1}) Installation de {2}...", "({0}/{1}) Installing {2}...");
-        Add("done", "Terminé.", "Done.");
-        Add("cancelled", "Annulé.", "Cancelled.");
-        Add("summary", "{0} installée(s), {1} déjà présente(s), {2} échec(s).",
-                       "{0} installed, {1} already installed, {2} failed.");
-        Add("no_result", "Aucune application ne correspond à la recherche.", "No app matches your search.");
-        Add("search_cue", "Rechercher une application...", "Search for an app...");
-        Add("winget_ok", "winget détecté ({0}).", "winget detected ({0}).");
-        Add("winget_missing_status", "winget est introuvable sur ce PC.", "winget was not found on this PC.");
-        Add("winget_missing_title", "winget manquant", "winget missing");
-        Add("winget_missing_body",
-            "winget est introuvable sur ce PC.\n\nInstalle \"Programme d'installation d'application\" depuis le Microsoft Store, puis relance le programme.",
-            "winget was not found on this PC.\n\nInstall \"App Installer\" from the Microsoft Store, then restart the program.");
-        Add("quit_confirm", "Une installation est en cours. Quitter quand même ?", "An installation is in progress. Quit anyway?");
-        Add("st_waiting", "En attente...", "Waiting...");
-        Add("st_running", "Installation en cours...", "Installing...");
-        Add("st_done", "Installé", "Installed");
-        Add("st_already", "Déjà installé", "Already installed");
-        Add("st_failed", "Échec", "Failed");
-        Add("language", "Langue", "Language");
-        Add("logos", "Logos", "Logos");
-        Add("clear_logos", "Vider le cache des logos et recharger", "Clear logo cache and reload");
-        Add("logos_reloading", "Rechargement des logos...", "Reloading logos...");
-        Add("close", "Fermer", "Close");
-        Add("about", "AppCrate 1.1 - licence MIT", "AppCrate 1.1 - MIT license");
-        Add("choose_lang", "Choisissez votre langue  /  Choose your language", "Choisissez votre langue  /  Choose your language");
-        Add("lang_hint", "Tu pourras la changer plus tard dans les paramètres.", "You can change it later in the settings.");
+        try
+        {
+            System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
+            foreach (string res in asm.GetManifestResourceNames())
+            {
+                if (!res.StartsWith("lang.") || !res.EndsWith(".txt")) continue;
+                string code = res.Substring(5, res.Length - 9);
+                using (Stream s = asm.GetManifestResourceStream(res))
+                    data[code] = Parse(s);
+            }
+        }
+        catch (Exception) { }
+        if (!data.ContainsKey("en")) data["en"] = new Dictionary<string, string>();
+        fallback = data["en"];
+
+        string[] order = new string[] { "fr", "en", "es", "it", "de", "pt", "nl", "ru", "zh", "ja", "ko" };
+        foreach (string c in order) if (data.ContainsKey(c)) codes.Add(c);
+        List<string> rest = new List<string>();
+        foreach (string c in data.Keys) if (!codes.Contains(c)) rest.Add(c);
+        rest.Sort();
+        codes.AddRange(rest);
+
+        string sys = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        Lang = data.ContainsKey(sys) ? sys : "en";
     }
 
-    public static int Index { get { return Lang == "en" ? 1 : 0; } }
+    static Dictionary<string, string> Parse(Stream s)
+    {
+        Dictionary<string, string> d = new Dictionary<string, string>();
+        using (StreamReader r = new StreamReader(s, Encoding.UTF8))
+        {
+            string line;
+            while ((line = r.ReadLine()) != null)
+            {
+                if (line.Length == 0 || line[0] == '#') continue;
+                int eq = line.IndexOf('=');
+                if (eq <= 0) continue;
+                d[line.Substring(0, eq).Trim()] = line.Substring(eq + 1).Trim().Replace("\\n", "\n");
+            }
+        }
+        return d;
+    }
+
+    public static List<string> Codes { get { return codes; } }
+
+    public static bool Has(string code) { return data.ContainsKey(code); }
+
+    public static string NameOf(string code)
+    {
+        string n;
+        return data[code].TryGetValue("name", out n) ? n : code;
+    }
+
+    public static string Lang
+    {
+        get { return lang; }
+        set
+        {
+            if (!data.ContainsKey(value)) value = "en";
+            lang = value;
+            cur = data[value];
+        }
+    }
+
+    // Renvoie null si la cle n'existe ni dans la langue courante ni en anglais
+    public static string Try(string key)
+    {
+        string v;
+        if (cur.TryGetValue(key, out v)) return v;
+        if (fallback.TryGetValue(key, out v)) return v;
+        return null;
+    }
 
     public static string Get(string key)
     {
-        string[] v;
-        return T.TryGetValue(key, out v) ? v[Index] : key;
+        return Try(key) ?? key;
     }
 
     public static string Get(string key, params object[] args)
@@ -108,7 +138,7 @@ static class Settings
                 if (p.Length == 2 && p[0].Trim() == "language")
                 {
                     string v = p[1].Trim();
-                    if (v == "fr" || v == "en") { L.Lang = v; return true; }
+                    if (L.Has(v)) { L.Lang = v; return true; }
                 }
             }
         }
@@ -253,6 +283,7 @@ class AppCard : DBControl
     public string AppName, AppId, Category;
     string description = "";
     Image icon;
+    bool installed;
     bool isChecked;
     St status;
     bool hover;
@@ -274,6 +305,12 @@ class AppCard : DBControl
     {
         get { return status; }
         set { status = value; Invalidate(); }
+    }
+
+    public bool Installed
+    {
+        get { return installed; }
+        set { installed = value; Invalidate(); }
     }
 
     public Image Icon
@@ -336,6 +373,23 @@ class AppCard : DBControl
             using (StringFormat sf = Gfx.Fmt(StringAlignment.Center, StringAlignment.Center))
             using (Brush b = new SolidBrush(Color.White))
                 g.DrawString(letter, Theme.F14B, b, new RectangleF(ic.X, ic.Y, ic.Width, ic.Height), sf);
+        }
+
+        // Pastille verte : deja installe sur ce PC
+        if (installed)
+        {
+            Rectangle bd = new Rectangle(ic.Right - 12, ic.Bottom - 12, 18, 18);
+            using (Brush ring = new SolidBrush(hot ? Theme.CardHover : Theme.Card))
+                g.FillEllipse(ring, bd.X - 2, bd.Y - 2, bd.Width + 4, bd.Height + 4);
+            using (Brush gb = new SolidBrush(Theme.Green)) g.FillEllipse(gb, bd);
+            using (Pen cp = new Pen(Color.White, 1.8f))
+            {
+                cp.StartCap = LineCap.Round;
+                cp.EndCap = LineCap.Round;
+                cp.LineJoin = LineJoin.Round;
+                g.DrawLines(cp, new Point[] {
+                    new Point(bd.X + 4, bd.Y + 9), new Point(bd.X + 7, bd.Y + 12), new Point(bd.X + 13, bd.Y + 5) });
+            }
         }
 
         // Nom
@@ -735,15 +789,38 @@ static class IconLoader
 
 class Entry
 {
-    public string Name, Id, Category, Site, DescFr, DescEn;
+    public string Name, Id, Category, Site;
     public AppCard Card;
 
-    public string Desc { get { return L.Index == 1 ? DescEn : DescFr; } }
+    public string Desc { get { return L.Try("app." + Id) ?? ""; } }
 }
 
 // =====================================================================
 //  Fenetres de dialogue (langue au premier lancement, parametres)
 // =====================================================================
+// Icone de l'application (integree a l'exe)
+static class AppIcon
+{
+    static Icon icon;
+
+    public static Icon Get()
+    {
+        if (icon != null) return icon;
+        try
+        {
+            System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
+            using (Stream s = asm.GetManifestResourceStream("AppCrate.ico"))
+            {
+                if (s != null) { icon = new Icon(s); return icon; }
+            }
+        }
+        catch (Exception) { }
+        try { icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+        catch (Exception) { }
+        return icon;
+    }
+}
+
 class DarkForm : Form
 {
     public DarkForm()
@@ -755,6 +832,7 @@ class DarkForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
+        Icon = AppIcon.Get();
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -769,9 +847,14 @@ class LangForm : DarkForm
     public LangForm()
     {
         Text = "AppCrate";
-        ClientSize = new Size(440, 270);
         StartPosition = FormStartPosition.CenterScreen;
         ShowInTaskbar = true;
+
+        int cols = 3, bw = 150, bh = 46, gap = 12, margin = 40, top = 120;
+        int n = L.Codes.Count;
+        int rows = (n + cols - 1) / cols;
+        int width = cols * bw + (cols - 1) * gap + margin * 2;
+        ClientSize = new Size(width, top + rows * (bh + gap) + 70);
 
         Label t = new Label();
         t.Text = "AppCrate";
@@ -779,7 +862,8 @@ class LangForm : DarkForm
         t.ForeColor = Theme.Text;
         t.AutoSize = false;
         t.TextAlign = ContentAlignment.MiddleCenter;
-        t.SetBounds(0, 24, 440, 50);
+        t.SetBounds(0, 20, width, 50);
+        Controls.Add(t);
 
         Label q = new Label();
         q.Text = L.Get("choose_lang");
@@ -787,32 +871,28 @@ class LangForm : DarkForm
         q.ForeColor = Theme.Muted;
         q.AutoSize = false;
         q.TextAlign = ContentAlignment.MiddleCenter;
-        q.SetBounds(0, 84, 440, 24);
+        q.SetBounds(0, 76, width, 24);
+        Controls.Add(q);
 
-        RoundButton fr = new RoundButton();
-        fr.Text = "Français";
-        fr.SetBounds(40, 130, 170, 60);
-        fr.SetColors(Theme.Accent, Theme.AccentHover);
-        fr.Click += delegate { Pick("fr"); };
-
-        RoundButton en = new RoundButton();
-        en.Text = "English";
-        en.SetBounds(230, 130, 170, 60);
-        en.SetColors(Theme.Accent, Theme.AccentHover);
-        en.Click += delegate { Pick("en"); };
+        for (int i = 0; i < n; i++)
+        {
+            string code = L.Codes[i];
+            RoundButton b = new RoundButton();
+            b.Text = L.NameOf(code);
+            b.SetBounds(margin + (i % cols) * (bw + gap), top + (i / cols) * (bh + gap), bw, bh);
+            if (code == L.Lang) b.SetColors(Theme.Accent, Theme.AccentHover);
+            else b.SetColors(Theme.Card, Theme.CardHover);
+            b.Click += delegate { Pick(code); };
+            Controls.Add(b);
+        }
 
         Label hint = new Label();
-        hint.Text = "Tu pourras la changer plus tard dans les paramètres.  /  You can change it later in the settings.";
+        hint.Text = L.Get("lang_hint");
         hint.Font = Theme.F85;
         hint.ForeColor = Theme.Muted;
         hint.AutoSize = false;
         hint.TextAlign = ContentAlignment.MiddleCenter;
-        hint.SetBounds(20, 210, 400, 40);
-
-        Controls.Add(t);
-        Controls.Add(q);
-        Controls.Add(fr);
-        Controls.Add(en);
+        hint.SetBounds(20, top + rows * (bh + gap) + 10, width - 40, 40);
         Controls.Add(hint);
     }
 
@@ -826,72 +906,83 @@ class LangForm : DarkForm
 
 class SettingsForm : DarkForm
 {
-    Label title, lblLang, lblLogos, lblAbout;
-    RoundButton btnFr, btnEn, btnClear, btnClose;
-    Action onLang, onClear;
+    Label title, lblLang, lblSel, lblLogos, lblAbout;
+    List<RoundButton> langBtns = new List<RoundButton>();
+    RoundButton btnExport, btnImport, btnClear, btnClose;
+    Action onLang, onClear, onExport, onImport;
 
-    public SettingsForm(Action onLanguageChanged, Action onClearLogos)
+    Label MakeLabel(Font f, Color c, int x, int y)
+    {
+        Label l = new Label();
+        l.Font = f;
+        l.ForeColor = c;
+        l.AutoSize = true;
+        l.Location = new Point(x, y);
+        Controls.Add(l);
+        return l;
+    }
+
+    RoundButton MakeButton(int x, int y, int w)
+    {
+        RoundButton b = new RoundButton();
+        b.SetBounds(x, y, w, 46);
+        Controls.Add(b);
+        return b;
+    }
+
+    public SettingsForm(Action onLanguageChanged, Action onClearLogos, Action onExportSelection, Action onImportSelection)
     {
         onLang = onLanguageChanged;
         onClear = onClearLogos;
-        ClientSize = new Size(460, 390);
+        onExport = onExportSelection;
+        onImport = onImportSelection;
         StartPosition = FormStartPosition.CenterParent;
 
-        title = new Label();
-        title.Font = Theme.F14B;
-        title.ForeColor = Theme.Text;
-        title.AutoSize = true;
-        title.Location = new Point(24, 20);
+        title = MakeLabel(Theme.F14B, Theme.Text, 24, 20);
 
-        lblLang = new Label();
-        lblLang.Font = Theme.F10B;
-        lblLang.ForeColor = Theme.Muted;
-        lblLang.AutoSize = true;
-        lblLang.Location = new Point(26, 78);
+        int y = 78;
+        lblLang = MakeLabel(Theme.F10B, Theme.Muted, 26, y);
+        y += 28;
+        int cols = 3, gap = 10, bh = 40;
+        int bw = (412 - gap * (cols - 1)) / cols;
+        for (int i = 0; i < L.Codes.Count; i++)
+        {
+            string code = L.Codes[i];
+            RoundButton b = MakeButton(24 + (i % cols) * (bw + gap), y + (i / cols) * (bh + gap), bw);
+            b.Height = bh;
+            b.Text = L.NameOf(code);
+            b.Click += delegate { SetLang(code); };
+            langBtns.Add(b);
+        }
+        int rows = (L.Codes.Count + cols - 1) / cols;
+        y += rows * (bh + gap) + 14;
 
-        btnFr = new RoundButton();
-        btnFr.Text = "Français";
-        btnFr.SetBounds(24, 106, 200, 46);
-        btnFr.Click += delegate { SetLang("fr"); };
+        lblSel = MakeLabel(Theme.F10B, Theme.Muted, 26, y);
+        y += 28;
+        btnExport = MakeButton(24, y, 200);
+        btnExport.Click += delegate { onExport(); };
+        btnImport = MakeButton(236, y, 200);
+        btnImport.Click += delegate { onImport(); };
+        y += 46 + 24;
 
-        btnEn = new RoundButton();
-        btnEn.Text = "English";
-        btnEn.SetBounds(236, 106, 200, 46);
-        btnEn.Click += delegate { SetLang("en"); };
-
-        lblLogos = new Label();
-        lblLogos.Font = Theme.F10B;
-        lblLogos.ForeColor = Theme.Muted;
-        lblLogos.AutoSize = true;
-        lblLogos.Location = new Point(26, 178);
-
-        btnClear = new RoundButton();
-        btnClear.SetBounds(24, 206, 412, 46);
+        lblLogos = MakeLabel(Theme.F10B, Theme.Muted, 26, y);
+        y += 28;
+        btnClear = MakeButton(24, y, 412);
         btnClear.Click += delegate
         {
             btnClear.Text = L.Get("logos_reloading");
             onClear();
         };
+        y += 46 + 22;
 
-        lblAbout = new Label();
-        lblAbout.Font = Theme.F9;
-        lblAbout.ForeColor = Theme.Muted;
-        lblAbout.AutoSize = true;
-        lblAbout.Location = new Point(26, 282);
+        lblAbout = MakeLabel(Theme.F9, Theme.Muted, 26, y);
+        y += 30;
 
-        btnClose = new RoundButton();
-        btnClose.SetBounds(24, 322, 412, 46);
+        btnClose = MakeButton(24, y, 412);
         btnClose.SetColors(Theme.Accent, Theme.AccentHover);
         btnClose.Click += delegate { Close(); };
 
-        Controls.Add(title);
-        Controls.Add(lblLang);
-        Controls.Add(btnFr);
-        Controls.Add(btnEn);
-        Controls.Add(lblLogos);
-        Controls.Add(btnClear);
-        Controls.Add(lblAbout);
-        Controls.Add(btnClose);
+        ClientSize = new Size(460, y + 46 + 24);
         Retext();
     }
 
@@ -900,12 +991,18 @@ class SettingsForm : DarkForm
         Text = L.Get("settings");
         title.Text = L.Get("settings");
         lblLang.Text = L.Get("language");
+        lblSel.Text = L.Get("selection");
         lblLogos.Text = L.Get("logos");
+        btnExport.Text = L.Get("export_sel");
+        btnImport.Text = L.Get("import_sel");
         btnClear.Text = L.Get("clear_logos");
         btnClose.Text = L.Get("close");
-        lblAbout.Text = L.Get("about");
-        if (L.Lang == "fr") btnFr.SetColors(Theme.Accent, Theme.AccentHover); else btnFr.SetColors(Theme.Card, Theme.CardHover);
-        if (L.Lang == "en") btnEn.SetColors(Theme.Accent, Theme.AccentHover); else btnEn.SetColors(Theme.Card, Theme.CardHover);
+        lblAbout.Text = L.Get("about", AppInfo.Version);
+        for (int i = 0; i < langBtns.Count; i++)
+        {
+            if (L.Codes[i] == L.Lang) langBtns[i].SetColors(Theme.Accent, Theme.AccentHover);
+            else langBtns[i].SetColors(Theme.Card, Theme.CardHover);
+        }
     }
 
     void SetLang(string lang)
@@ -924,112 +1021,111 @@ class SettingsForm : DarkForm
 public class MainForm : Form
 {
     // Catalogue.
-    //   "#Categorie|Category" ouvre une categorie (nom francais|nom anglais)
-    //   "Nom|Identifiant winget|site web (pour le logo)|Description FR|Description EN"
+    //   "#Categorie" ouvre une categorie (le nom affiche vient de lang\xx.txt : cat.<Categorie>)
+    //   "Nom|Identifiant winget|site web (pour le logo)"  (description : app.<Identifiant> dans lang\xx.txt)
     // Pour trouver l'identifiant d'une appli : "winget search nom" dans un terminal.
     static readonly string[] DATA = new string[]
     {
-        "#Navigateurs|Browsers",
-        "Google Chrome|Google.Chrome|google.com/chrome|Navigateur rapide de Google, synchronisé avec ton compte.|Fast web browser from Google, synced with your account.",
-        "Mozilla Firefox|Mozilla.Firefox|mozilla.org/firefox|Navigateur libre de Mozilla, axé sur la vie privée.|Free, privacy-focused browser from Mozilla.",
-        "Brave|Brave.Brave|brave.com|Navigateur qui bloque pubs et traqueurs par défaut.|Browser that blocks ads and trackers by default.",
-        "Opera|Opera.Opera|opera.com|Navigateur avec VPN, bloqueur de pubs et messageries intégrés.|Browser with built-in VPN, ad blocker and messengers.",
-        "Vivaldi|Vivaldi.Vivaldi|vivaldi.com|Navigateur très personnalisable, pensé pour les utilisateurs avancés.|Highly customizable browser built for power users.",
+        "#Navigateurs",
+        "Google Chrome|Google.Chrome|google.com/chrome",
+        "Mozilla Firefox|Mozilla.Firefox|mozilla.org/firefox",
+        "Brave|Brave.Brave|brave.com",
+        "Opera|Opera.Opera|opera.com",
+        "Vivaldi|Vivaldi.Vivaldi|vivaldi.com",
 
-        "#Messagerie|Messaging",
-        "Discord|Discord.Discord|discord.com|Chat vocal, vidéo et texte pour les communautés et les joueurs.|Voice, video and text chat for communities and gamers.",
-        "Zoom|Zoom.Zoom|zoom.us|Visioconférences et réunions en ligne.|Video meetings and online conferencing.",
-        "Microsoft Teams|Microsoft.Teams|microsoft.com/microsoft-teams/group-chat-software|Messagerie et visio de Microsoft pour le travail en équipe.|Microsoft chat and video calls for teamwork.",
-        "Telegram|Telegram.TelegramDesktop|telegram.org|Messagerie rapide avec groupes, canaux et gros fichiers.|Fast messenger with groups, channels and large file sharing.",
-        "Signal|OpenWhisperSystems.Signal|signal.org|Messagerie chiffrée de bout en bout, centrée sur la confidentialité.|End-to-end encrypted messenger focused on privacy.",
-        "Slack|SlackTechnologies.Slack|slack.com|Messagerie d'équipe organisée par canaux.|Team messaging organized in channels.",
+        "#Messagerie",
+        "Discord|Discord.Discord|discord.com",
+        "Zoom|Zoom.Zoom|zoom.us",
+        "Microsoft Teams|Microsoft.Teams|microsoft.com/microsoft-teams/group-chat-software",
+        "Telegram|Telegram.TelegramDesktop|telegram.org",
+        "Signal|OpenWhisperSystems.Signal|signal.org",
+        "Slack|SlackTechnologies.Slack|slack.com",
 
-        "#Multimédia|Multimedia",
-        "VLC|VideoLAN.VLC|videolan.org|Lecteur multimédia qui lit presque tous les formats audio et vidéo.|Media player that plays almost any audio or video format.",
-        "Spotify|Spotify.Spotify|spotify.com|Streaming musical et podcasts.|Music and podcast streaming.",
-        "Audacity|Audacity.Audacity|audacityteam.org|Éditeur audio gratuit pour enregistrer et retoucher des sons.|Free audio editor to record and edit sounds.",
-        "OBS Studio|OBSProject.OBSStudio|obsproject.com|Enregistrement d'écran et streaming en direct.|Screen recording and live streaming.",
-        "HandBrake|HandBrake.HandBrake|handbrake.fr|Convertisseur vidéo libre pour changer de format ou compresser.|Free video converter to change format or compress files.",
-        "MPC-HC|clsid2.mpc-hc|mpc-hc.org|Lecteur vidéo léger et rapide, dans l'esprit du Lecteur Windows Media classique.|Lightweight, fast video player in the classic Windows Media Player spirit.",
-        "foobar2000|PeterPawlowski.foobar2000|foobar2000.org|Lecteur audio léger et très configurable.|Lightweight and highly configurable audio player.",
-        "Kodi|XBMCFoundation.Kodi|kodi.tv|Centre multimédia pour organiser films, séries et musique.|Media center to organize movies, shows and music.",
+        "#Multimédia",
+        "VLC|VideoLAN.VLC|videolan.org",
+        "Spotify|Spotify.Spotify|spotify.com",
+        "Audacity|Audacity.Audacity|audacityteam.org",
+        "OBS Studio|OBSProject.OBSStudio|obsproject.com",
+        "HandBrake|HandBrake.HandBrake|handbrake.fr",
+        "MPC-HC|clsid2.mpc-hc|mpc-hc.org",
+        "foobar2000|PeterPawlowski.foobar2000|foobar2000.org",
+        "Kodi|XBMCFoundation.Kodi|kodi.tv",
 
-        "#Images et graphisme|Images & graphics",
-        "GIMP|GIMP.GIMP|gimp.org|Retouche d'images avancée, alternative libre à Photoshop.|Advanced image editor, a free alternative to Photoshop.",
-        "Inkscape|Inkscape.Inkscape|inkscape.org|Dessin vectoriel libre, alternative à Illustrator.|Free vector graphics editor, an alternative to Illustrator.",
-        "Krita|Krita.Krita|krita.org|Logiciel de peinture numérique et d'illustration.|Digital painting and illustration software.",
-        "Blender|BlenderFoundation.Blender|blender.org|Création 3D : modélisation, animation et rendu.|3D creation suite: modeling, animation and rendering.",
-        "Paint.NET|dotPDN.PaintDotNet|getpaint.net|Éditeur d'images simple et rapide, un Paint en bien plus complet.|Simple, fast image editor, like Paint but far more capable.",
-        "IrfanView|IrfanSkiljan.IrfanView|irfanview.com|Visionneuse d'images très légère avec conversion en lot.|Very light image viewer with batch conversion.",
-        "ShareX|ShareX.ShareX|getsharex.com|Captures d'écran, GIF et partage rapide en ligne.|Screenshots, GIF capture and quick online sharing.",
-        "Greenshot|Greenshot.Greenshot|getgreenshot.org|Captures d'écran avec annotations en un raccourci.|Screenshots with annotations from a single shortcut.",
+        "#Images et graphisme",
+        "GIMP|GIMP.GIMP|gimp.org",
+        "Inkscape|Inkscape.Inkscape|inkscape.org",
+        "Krita|Krita.Krita|krita.org",
+        "Blender|BlenderFoundation.Blender|blender.org",
+        "Paint.NET|dotPDN.PaintDotNet|getpaint.net",
+        "IrfanView|IrfanSkiljan.IrfanView|irfanview.com",
+        "ShareX|ShareX.ShareX|getsharex.com",
+        "Greenshot|Greenshot.Greenshot|getgreenshot.org",
 
-        "#Bureautique|Office",
-        "LibreOffice|TheDocumentFoundation.LibreOffice|libreoffice.org|Suite bureautique libre : texte, tableur, présentations.|Free office suite: documents, spreadsheets, presentations.",
-        "Adobe Acrobat Reader|Adobe.Acrobat.Reader.64-bit|adobe.com/acrobat|Lecture, annotation et signature de fichiers PDF.|Read, annotate and sign PDF files.",
-        "SumatraPDF|SumatraPDF.SumatraPDF|sumatrapdfreader.org|Lecteur de PDF et d'ebooks ultra léger et rapide.|Ultra-light and fast PDF and ebook reader.",
-        "Notepad++|Notepad++.Notepad++|notepad-plus-plus.org|Éditeur de texte et de code léger avec coloration syntaxique.|Lightweight text and code editor with syntax highlighting.",
-        "Obsidian|Obsidian.Obsidian|obsidian.md|Prise de notes en Markdown, avec des notes reliées entre elles.|Markdown note-taking with linked notes.",
-        "Notion|Notion.Notion|notion.so|Notes, tâches et bases de données tout-en-un.|All-in-one notes, tasks and databases.",
+        "#Bureautique",
+        "LibreOffice|TheDocumentFoundation.LibreOffice|libreoffice.org",
+        "Adobe Acrobat Reader|Adobe.Acrobat.Reader.64-bit|adobe.com/acrobat",
+        "SumatraPDF|SumatraPDF.SumatraPDF|sumatrapdfreader.org",
+        "Notepad++|Notepad++.Notepad++|notepad-plus-plus.org",
+        "Obsidian|Obsidian.Obsidian|obsidian.md",
+        "Notion|Notion.Notion|notion.so",
 
-        "#Utilitaires|Utilities",
-        "7-Zip|7zip.7zip|7-zip.org|Compression et extraction d'archives (zip, 7z, rar...).|Archive compression and extraction (zip, 7z, rar...).",
-        "WinRAR|RARLab.WinRAR|win-rar.com|Gestionnaire d'archives RAR et ZIP.|RAR and ZIP archive manager.",
-        "Everything|voidtools.Everything|voidtools.com|Recherche instantanée de fichiers sur tout le PC.|Instant file search across your whole PC.",
-        "PowerToys|Microsoft.PowerToys|microsoft.com|Outils Microsoft pour les utilisateurs avancés de Windows.|Microsoft utilities for Windows power users.",
-        "qBittorrent|qBittorrent.qBittorrent|qbittorrent.org|Client BitTorrent libre et sans publicité.|Free, ad-free BitTorrent client.",
-        "Bitwarden|Bitwarden.Bitwarden|bitwarden.com|Gestionnaire de mots de passe libre et sécurisé.|Free and secure password manager.",
-        "KeePassXC|KeePassXCTeam.KeePassXC|keepassxc.org|Gestionnaire de mots de passe hors ligne.|Offline password manager.",
-        "AnyDesk|AnyDesk.AnyDesk|anydesk.com|Prise de contrôle à distance d'un ordinateur.|Remote desktop access and control.",
-        "TeamViewer|TeamViewer.TeamViewer|teamviewer.com|Assistance et accès à distance.|Remote support and access.",
-        "Rufus|Rufus.Rufus|rufus.ie|Crée des clés USB bootables (Windows, Linux...).|Creates bootable USB drives (Windows, Linux...).",
-        "balenaEtcher|Balena.Etcher|etcher.balena.io|Grave une image ISO sur une clé USB ou une carte SD.|Flashes ISO images to USB drives or SD cards.",
-        "WinDirStat|WinDirStat.WinDirStat|windirstat.net|Montre ce qui prend de la place sur tes disques.|Shows what is using space on your drives.",
-        "Malwarebytes|Malwarebytes.Malwarebytes|malwarebytes.com|Détection et suppression de logiciels malveillants.|Malware detection and removal.",
+        "#Utilitaires",
+        "7-Zip|7zip.7zip|7-zip.org",
+        "WinRAR|RARLab.WinRAR|win-rar.com",
+        "Everything|voidtools.Everything|voidtools.com",
+        "PowerToys|Microsoft.PowerToys|microsoft.com",
+        "qBittorrent|qBittorrent.qBittorrent|qbittorrent.org",
+        "Bitwarden|Bitwarden.Bitwarden|bitwarden.com",
+        "KeePassXC|KeePassXCTeam.KeePassXC|keepassxc.org",
+        "AnyDesk|AnyDesk.AnyDesk|anydesk.com",
+        "TeamViewer|TeamViewer.TeamViewer|teamviewer.com",
+        "Rufus|Rufus.Rufus|rufus.ie",
+        "balenaEtcher|Balena.Etcher|etcher.balena.io",
+        "WinDirStat|WinDirStat.WinDirStat|windirstat.net",
+        "Malwarebytes|Malwarebytes.Malwarebytes|malwarebytes.com",
 
-        "#Infos système|System info",
-        "CPU-Z|CPUID.CPU-Z|cpuid.com|Détails sur le processeur, la carte mère et la mémoire.|Details about your CPU, motherboard and memory.",
-        "HWMonitor|CPUID.HWMonitor|cpuid.com|Suivi des températures, tensions et ventilateurs.|Monitors temperatures, voltages and fan speeds.",
-        "GPU-Z|TechPowerUp.GPU-Z|techpowerup.com|Informations et suivi de la carte graphique.|Graphics card information and monitoring.",
-        "CrystalDiskInfo|CrystalDewWorld.CrystalDiskInfo|crystalmark.info|État de santé de tes disques (SMART).|Drive health status (SMART).",
-        "CrystalDiskMark|CrystalDewWorld.CrystalDiskMark|crystalmark.info|Teste la vitesse de tes disques et SSD.|Benchmarks the speed of your drives and SSDs.",
+        "#Infos système",
+        "CPU-Z|CPUID.CPU-Z|cpuid.com",
+        "HWMonitor|CPUID.HWMonitor|cpuid.com",
+        "GPU-Z|TechPowerUp.GPU-Z|techpowerup.com",
+        "CrystalDiskInfo|CrystalDewWorld.CrystalDiskInfo|crystalmark.info",
+        "CrystalDiskMark|CrystalDewWorld.CrystalDiskMark|crystalmark.info",
 
-        "#Développement|Development",
-        "Visual Studio Code|Microsoft.VisualStudioCode|code.visualstudio.com|Éditeur de code de Microsoft, extensible, pour tous les langages.|Microsoft's extensible code editor for every language.",
-        "Git|Git.Git|git-scm.com|Gestion de versions de code, indispensable aux développeurs.|Version control, essential for developers.",
-        "GitHub Desktop|GitHub.GitHubDesktop|desktop.github.com|Interface graphique simple pour Git et GitHub.|Simple graphical interface for Git and GitHub.",
-        "Python 3.12|Python.Python.3.12|python.org|Langage de programmation polyvalent et facile à apprendre.|Versatile, easy-to-learn programming language.",
-        "Node.js LTS|OpenJS.NodeJS.LTS|nodejs.org|Environnement JavaScript côté serveur (version LTS).|Server-side JavaScript runtime (LTS version).",
-        "Windows Terminal|Microsoft.WindowsTerminal|microsoft.com|Terminal moderne à onglets : PowerShell, CMD, WSL.|Modern tabbed terminal: PowerShell, CMD, WSL.",
-        "Docker Desktop|Docker.DockerDesktop|docker.com|Conteneurs pour développer et déployer des applications.|Containers to build and ship applications.",
-        "IntelliJ IDEA Community|JetBrains.IntelliJIDEA.Community|jetbrains.com/idea|IDE Java et Kotlin de JetBrains (édition gratuite).|JetBrains IDE for Java and Kotlin (free edition).",
-        "Postman|Postman.Postman|postman.com|Teste et documente des API.|Test and document APIs.",
-        "WinSCP|WinSCP.WinSCP|winscp.net|Transfert de fichiers SFTP, FTP et SCP.|SFTP, FTP and SCP file transfer.",
-        "PuTTY|PuTTY.PuTTY|putty.org|Client SSH et Telnet pour se connecter à des serveurs.|SSH and Telnet client to connect to servers.",
-        "Java JDK 21 (Temurin)|EclipseAdoptium.Temurin.21.JDK|adoptium.net|Kit de développement Java 21 (Eclipse Temurin).|Java 21 development kit (Eclipse Temurin).",
+        "#Développement",
+        "Visual Studio Code|Microsoft.VisualStudioCode|code.visualstudio.com",
+        "Git|Git.Git|git-scm.com",
+        "GitHub Desktop|GitHub.GitHubDesktop|desktop.github.com",
+        "Python 3.12|Python.Python.3.12|python.org",
+        "Node.js LTS|OpenJS.NodeJS.LTS|nodejs.org",
+        "Windows Terminal|Microsoft.WindowsTerminal|microsoft.com",
+        "Docker Desktop|Docker.DockerDesktop|docker.com",
+        "IntelliJ IDEA Community|JetBrains.IntelliJIDEA.Community|jetbrains.com/idea",
+        "Postman|Postman.Postman|postman.com",
+        "WinSCP|WinSCP.WinSCP|winscp.net",
+        "PuTTY|PuTTY.PuTTY|putty.org",
+        "Java JDK 21 (Temurin)|EclipseAdoptium.Temurin.21.JDK|adoptium.net",
 
-        "#Jeux|Games",
-        "Steam|Valve.Steam|store.steampowered.com|La plus grande boutique et bibliothèque de jeux PC.|The largest PC game store and library.",
-        "Epic Games Launcher|EpicGames.EpicGamesLauncher|epicgames.com|Boutique d'Epic, avec des jeux gratuits chaque semaine.|Epic's game store, with free games every week.",
-        "GOG Galaxy|GOG.Galaxy|gog.com|Bibliothèque de jeux sans DRM qui réunit tes lanceurs.|DRM-free game library that unifies your launchers.",
-        "Ubisoft Connect|Ubisoft.Connect|ubisoft.com|Lanceur pour les jeux Ubisoft.|Launcher for Ubisoft games.",
-        "EA app|ElectronicArts.EADesktop|ea.com|Lanceur pour les jeux Electronic Arts.|Launcher for Electronic Arts games.",
+        "#Jeux",
+        "Steam|Valve.Steam|store.steampowered.com",
+        "Epic Games Launcher|EpicGames.EpicGamesLauncher|epicgames.com",
+        "GOG Galaxy|GOG.Galaxy|gog.com",
+        "Ubisoft Connect|Ubisoft.Connect|ubisoft.com",
+        "EA app|ElectronicArts.EADesktop|ea.com",
 
-        "#Stockage cloud|Cloud storage",
-        "Dropbox|Dropbox.Dropbox|dropbox.com|Stockage cloud et synchronisation de fichiers.|Cloud storage and file sync.",
-        "Google Drive|Google.GoogleDrive|drive.google.com|Stockage cloud de Google synchronisé avec ton PC.|Google cloud storage synced with your PC.",
-        "Nextcloud|Nextcloud.NextcloudDesktop|nextcloud.com|Cloud personnel auto-hébergé : fichiers, agenda, contacts.|Self-hosted personal cloud: files, calendar, contacts.",
+        "#Stockage cloud",
+        "Dropbox|Dropbox.Dropbox|dropbox.com",
+        "Google Drive|Google.GoogleDrive|drive.google.com",
+        "Nextcloud|Nextcloud.NextcloudDesktop|nextcloud.com",
 
-        "#Runtimes|Runtimes",
-        "Visual C++ 2015-2022 x64|Microsoft.VCRedist.2015+.x64|microsoft.com|Bibliothèques requises par de nombreux jeux et logiciels (64 bits).|Libraries required by many games and apps (64-bit).",
-        "Visual C++ 2015-2022 x86|Microsoft.VCRedist.2015+.x86|microsoft.com|Bibliothèques requises par de nombreux jeux et logiciels (32 bits).|Libraries required by many games and apps (32-bit).",
-        ".NET Desktop Runtime 8|Microsoft.DotNet.DesktopRuntime.8|dotnet.microsoft.com|Nécessaire pour lancer des applications Windows .NET 8.|Required to run .NET 8 Windows applications.",
-        "Java Runtime (JRE)|Oracle.JavaRuntimeEnvironment|java.com|Permet d'exécuter les applications et jeux Java (Minecraft...).|Runs Java applications and games (Minecraft...)."
+        "#Runtimes",
+        "Visual C++ 2015-2022 x64|Microsoft.VCRedist.2015+.x64|microsoft.com",
+        "Visual C++ 2015-2022 x86|Microsoft.VCRedist.2015+.x86|microsoft.com",
+        ".NET Desktop Runtime 8|Microsoft.DotNet.DesktopRuntime.8|dotnet.microsoft.com",
+        "Java Runtime (JRE)|Oracle.JavaRuntimeEnvironment|java.com"
     };
 
     List<Entry> entries = new List<Entry>();
     List<string> categories = new List<string>();
-    Dictionary<string, string> catEn = new Dictionary<string, string>();
     Dictionary<string, CatHeader> headers = new Dictionary<string, CatHeader>();
     List<NavItem> navs = new List<NavItem>();
 
@@ -1051,6 +1147,7 @@ public class MainForm : Form
     public MainForm()
     {
         Text = "AppCrate";
+        Icon = AppIcon.Get();
         BackColor = Theme.Bg;
         ForeColor = Theme.Text;
         Font = Theme.F9;
@@ -1058,6 +1155,8 @@ public class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(1200, 760);
         MinimumSize = new Size(1000, 620);
+        KeyPreview = true;
+        KeyDown += OnKey;
 
         // ---- Zone centrale (cartes)
         flow = new DBFlow();
@@ -1082,9 +1181,7 @@ public class MainForm : Form
             if (line.Length == 0) continue;
             if (line[0] == '#')
             {
-                string[] cp = line.Substring(1).Split('|');
-                cur = cp[0];
-                catEn[cur] = cp.Length > 1 ? cp[1] : cp[0];
+                cur = line.Substring(1);
                 categories.Add(cur);
                 CatHeader h = new CatHeader();
                 h.Key = cur;
@@ -1100,8 +1197,6 @@ public class MainForm : Form
                 en.Name = p[0];
                 en.Id = p[1];
                 en.Site = p.Length > 2 ? p[2] : null;
-                en.DescFr = p.Length > 3 ? p[3] : "";
-                en.DescEn = p.Length > 4 ? p[4] : en.DescFr;
                 en.Category = cur;
                 AppCard c = new AppCard();
                 c.AppName = en.Name;
@@ -1244,7 +1339,7 @@ public class MainForm : Form
 
     string CatName(string key)
     {
-        return L.Index == 1 ? catEn[key] : key;
+        return L.Try("cat." + key) ?? key;
     }
 
     void AddNav(string cat, int index)
@@ -1288,6 +1383,7 @@ public class MainForm : Form
                 string v = p.StandardOutput.ReadToEnd().Trim();
                 p.WaitForExit();
                 Log(L.Get("winget_ok", v));
+                ScanInstalled(true);
             }
         }
         catch (Exception)
@@ -1319,7 +1415,7 @@ public class MainForm : Form
         {
             string d = en.Desc;
             en.Card.Description = d;
-            tip.SetToolTip(en.Card, en.Id + "\n" + d);
+            UpdateTip(en);
         }
         if (search.Input.IsHandleCreated)
         {
@@ -1334,7 +1430,7 @@ public class MainForm : Form
 
     void OpenSettings()
     {
-        using (SettingsForm f = new SettingsForm(ApplyLanguage, ClearLogos))
+        using (SettingsForm f = new SettingsForm(ApplyLanguage, ClearLogos, ExportSelection, ImportSelection))
             f.ShowDialog(this);
     }
 
@@ -1343,6 +1439,127 @@ public class MainForm : Form
         IconLoader.ClearCache();
         foreach (Entry en in entries) en.Card.Icon = null;
         StartIconLoading();
+    }
+
+    void UpdateTip(Entry en)
+    {
+        string t = en.Id + "\n" + en.Desc;
+        if (en.Card.Installed) t += "\n" + L.Get("installed_tag");
+        tip.SetToolTip(en.Card, t);
+    }
+
+    // Raccourcis : Ctrl+F = rechercher, Echap = effacer la recherche
+    void OnKey(object sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.F)
+        {
+            search.Input.Focus();
+            search.Input.SelectAll();
+            e.SuppressKeyPress = true;
+        }
+        else if (e.KeyCode == Keys.Escape && search.Input.Text.Length > 0)
+        {
+            search.Input.Clear();
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    // ---------- Detection des applications deja installees ----------
+    // "winget export" produit un JSON avec tous les identifiants reconnus : fiable, sans souci de largeur de console.
+    void ScanInstalled(bool announce)
+    {
+        Thread t = new Thread(delegate()
+        {
+            try
+            {
+                string tmp = Path.Combine(Path.GetTempPath(), "appcrate_export_" + Process.GetCurrentProcess().Id + ".json");
+                ProcessStartInfo psi = new ProcessStartInfo("winget", "export -o \"" + tmp + "\" --accept-source-agreements");
+                psi.UseShellExecute = false;
+                psi.CreateNoWindow = true;
+                psi.RedirectStandardOutput = true;
+                using (Process p = Process.Start(psi))
+                {
+                    p.StandardOutput.ReadToEnd();
+                    p.WaitForExit();
+                }
+                if (!File.Exists(tmp)) return;
+                string json = File.ReadAllText(tmp, Encoding.UTF8);
+                try { File.Delete(tmp); } catch (Exception) { }
+
+                Dictionary<string, bool> ids = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+                foreach (Match m in Regex.Matches(json, "\"PackageIdentifier\"\\s*:\\s*\"([^\"]+)\""))
+                    ids[m.Groups[1].Value] = true;
+
+                UI(delegate
+                {
+                    int n = 0;
+                    foreach (Entry en in entries)
+                    {
+                        bool inst = ids.ContainsKey(en.Id);
+                        en.Card.Installed = inst;
+                        if (inst) n++;
+                        UpdateTip(en);
+                    }
+                    if (announce && !installing) lblStatus.Text = L.Get("installed_found", n);
+                });
+            }
+            catch (Exception) { }
+        });
+        t.IsBackground = true;
+        t.Start();
+    }
+
+    // ---------- Export / import de la selection ----------
+    void ExportSelection()
+    {
+        using (SaveFileDialog d = new SaveFileDialog())
+        {
+            d.Filter = "AppCrate (*.txt)|*.txt";
+            d.FileName = "appcrate-selection.txt";
+            if (d.ShowDialog() != DialogResult.OK) return;
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("# AppCrate selection - one winget id per line");
+            foreach (Entry en in entries)
+                if (en.Card.IsChecked) sb.AppendLine(en.Id);
+            try
+            {
+                File.WriteAllText(d.FileName, sb.ToString(), Encoding.UTF8);
+                lblStatus.Text = L.Get("sel_exported", d.FileName);
+            }
+            catch (Exception ex) { lblStatus.Text = ex.Message; }
+        }
+    }
+
+    void ImportSelection()
+    {
+        using (OpenFileDialog d = new OpenFileDialog())
+        {
+            d.Filter = "AppCrate (*.txt)|*.txt|*.*|*.*";
+            if (d.ShowDialog() != DialogResult.OK) return;
+            Dictionary<string, bool> ids = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (string raw in File.ReadAllLines(d.FileName, Encoding.UTF8))
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0 || line[0] == '#') continue;
+                    ids[line.Split(new char[] { '\t', ' ', ';' })[0]] = true;
+                }
+            }
+            catch (Exception ex) { lblStatus.Text = ex.Message; return; }
+
+            int n = 0;
+            bulk = true;
+            foreach (Entry en in entries)
+            {
+                bool want = ids.ContainsKey(en.Id);
+                en.Card.IsChecked = want;
+                if (want) n++;
+            }
+            bulk = false;
+            RefreshCounts();
+            lblStatus.Text = L.Get("sel_imported", n);
+        }
     }
 
     // ---------- Logos ----------
@@ -1633,6 +1850,7 @@ public class MainForm : Form
             foreach (Entry e in todo)
                 if (e.Card.Status == St.Waiting || e.Card.Status == St.Running) e.Card.Status = St.None;
             SetInstalling(false);
+            ScanInstalled(false);
             lblStatus.Text = (wasCancelled ? L.Get("cancelled") : L.Get("done")) + " " + L.Get("summary", fOk, fAlready, fFailed);
             if (fFailed > 0) logPanel.Visible = true;
         });
