@@ -45,14 +45,6 @@ app.Identifier.winget=...
 
 L'identifiant se trouve avec `winget search nom`. Le site web sert uniquement à récupérer le logo.
 
-#### Ajouter une langue
-
-1. Copie `lang/en.txt` en `lang/xx.txt` (`xx` = code de la langue, ex. `nl`, `pl`, `tr`)
-2. Change la ligne `name=` (nom affiché, dans la langue elle-même) et traduis les valeurs
-3. Relance `build.bat` : la langue apparaît toute seule dans la liste
-
-> Les textes manquants retombent automatiquement sur l'anglais.
-
 #### Logos et marques
 
 Les logos ne sont **pas** inclus dans ce dépôt : ils sont récupérés à l'exécution depuis des services de favicons publics et stockés dans `%LocalAppData%\AppCrate\icons`. Les noms et logos appartiennent à leurs propriétaires respectifs. AppCrate n'est affilié à aucun des logiciels listés.
@@ -101,14 +93,6 @@ app.Identifier.winget=...
 ```
 
 The identifier can be found with `winget search name`. The website is only used to fetch the logo.
-
-#### Add a language
-
-1. Copy `lang/en.txt` to `lang/xx.txt` (`xx` = language code, e.g. `nl`, `pl`, `tr`)
-2. Change the `name=` line (display name, in the language itself) and translate the values
-3. Run `build.bat` again: the language shows up by itself in the list
-
-> Missing texts automatically fall back to English.
 
 #### Logos and trademarks
 
@@ -159,14 +143,6 @@ app.Identifier.winget=...
 
 El identificador se encuentra con `winget search nombre`. El sitio web solo sirve para obtener el logotipo.
 
-#### Añadir un idioma
-
-1. Copia `lang/en.txt` como `lang/xx.txt` (`xx` = código del idioma, p. ej. `nl`, `pl`, `tr`)
-2. Cambia la línea `name=` (nombre mostrado, en el propio idioma) y traduce los valores
-3. Vuelve a ejecutar `build.bat`: el idioma aparece solo en la lista
-
-> Los textos que falten se sustituyen automáticamente por el inglés.
-
 #### Logotipos y marcas
 
 Los logotipos **no** se incluyen en este repositorio: se obtienen al ejecutar la aplicación desde servicios públicos de favicons y se guardan en `%LocalAppData%\AppCrate\icons`. Los nombres y logotipos pertenecen a sus respectivos propietarios. AppCrate no está afiliado a ninguno de los programas listados.
@@ -215,14 +191,6 @@ app.Identifier.winget=...
 ```
 
 L'identificatore si trova con `winget search nome`. Il sito web serve solo a recuperare il logo.
-
-#### Aggiungere una lingua
-
-1. Copia `lang/en.txt` in `lang/xx.txt` (`xx` = codice della lingua, es. `nl`, `pl`, `tr`)
-2. Cambia la riga `name=` (nome visualizzato, nella lingua stessa) e traduci i valori
-3. Riesegui `build.bat`: la lingua compare da sola nell'elenco
-
-> I testi mancanti tornano automaticamente all'inglese.
 
 #### Loghi e marchi
 
@@ -273,14 +241,6 @@ app.Identifier.winget=...
 
 Die Kennung findest du mit `winget search name`. Die Website dient nur zum Abrufen des Logos.
 
-#### Sprache hinzufügen
-
-1. Kopiere `lang/en.txt` nach `lang/xx.txt` (`xx` = Sprachcode, z. B. `nl`, `pl`, `tr`)
-2. Ändere die Zeile `name=` (Anzeigename, in der Sprache selbst) und übersetze die Werte
-3. Führe `build.bat` erneut aus: Die Sprache erscheint automatisch in der Liste
-
-> Fehlende Texte werden automatisch durch Englisch ersetzt.
-
 #### Logos und Marken
 
 Die Logos sind **nicht** im Repository enthalten: Sie werden zur Laufzeit von öffentlichen Favicon-Diensten geladen und in `%LocalAppData%\AppCrate\icons` gespeichert. Namen und Logos gehören ihren jeweiligen Eigentümern. AppCrate steht in keiner Verbindung zu den aufgeführten Programmen.
@@ -329,14 +289,6 @@ app.Identifier.winget=...
 ```
 
 O identificador é encontrado com `winget search nome`. O site serve apenas para obter o logotipo.
-
-#### Adicionar um idioma
-
-1. Copie `lang/en.txt` para `lang/xx.txt` (`xx` = código do idioma, ex.: `nl`, `pl`, `tr`)
-2. Altere a linha `name=` (nome exibido, no próprio idioma) e traduza os valores
-3. Execute `build.bat` novamente: o idioma aparece sozinho na lista
-
-> Os textos ausentes voltam automaticamente para o inglês.
 
 #### Logotipos e marcas
 
@@ -387,14 +339,6 @@ app.Identifier.winget=...
 
 Идентификатор можно найти командой `winget search имя`. Сайт нужен только для получения логотипа.
 
-#### Добавить язык
-
-1. Скопируйте `lang/en.txt` в `lang/xx.txt` (`xx` — код языка, например `nl`, `pl`, `tr`)
-2. Измените строку `name=` (отображаемое название на самом языке) и переведите значения
-3. Снова запустите `build.bat`: язык появится в списке автоматически
-
-> Недостающие тексты автоматически заменяются английскими.
-
 #### Логотипы и товарные знаки
 
 Логотипы **не** входят в этот репозиторий: они загружаются во время работы из общедоступных сервисов значков сайтов и сохраняются в `%LocalAppData%\AppCrate\icons`. Названия и логотипы принадлежат их владельцам. AppCrate не связан ни с одной из перечисленных программ.
@@ -443,14 +387,6 @@ app.Identifier.winget=...
 ```
 
 可以用 `winget search 名称` 查找标识符。网站地址仅用于获取图标。
-
-#### 添加语言
-
-1. 将 `lang/en.txt` 复制为 `lang/xx.txt`（`xx` 为语言代码，例如 `nl`、`pl`、`tr`）
-2. 修改 `name=` 一行（用该语言本身显示的名称）并翻译其中的内容
-3. 重新运行 `build.bat`：该语言会自动出现在列表中
-
-> 缺失的文本会自动回退为英文。
 
 #### 图标与商标
 
@@ -501,14 +437,6 @@ app.Identifier.winget=...
 
 識別子は `winget search 名前` で調べられます。ウェブサイトはロゴの取得にのみ使われます。
 
-#### 言語を追加する
-
-1. `lang/en.txt` を `lang/xx.txt` にコピー（`xx` は言語コード。例：`nl`、`pl`、`tr`）
-2. `name=` の行（その言語自身での表示名）を変更し、値を翻訳
-3. `build.bat` をもう一度実行：言語が自動的に一覧に表示されます
-
-> 不足しているテキストは自動的に英語で表示されます。
-
 #### ロゴと商標
 
 ロゴはこのリポジトリには**含まれていません**。実行時に公開のファビコンサービスから取得し、`%LocalAppData%\AppCrate\icons` に保存します。名称とロゴはそれぞれの権利者に帰属します。AppCrate は掲載されているいずれのソフトウェアとも提携していません。
@@ -557,14 +485,6 @@ app.Identifier.winget=...
 ```
 
 식별자는 `winget search 이름`으로 찾을 수 있습니다. 웹사이트는 로고를 가져오는 데만 사용됩니다.
-
-#### 언어 추가하기
-
-1. `lang/en.txt`를 `lang/xx.txt`로 복사 (`xx` = 언어 코드, 예: `nl`, `pl`, `tr`)
-2. `name=` 줄(해당 언어로 표시되는 이름)을 바꾸고 값을 번역
-3. `build.bat`을 다시 실행: 언어가 목록에 자동으로 나타납니다
-
-> 누락된 문구는 자동으로 영어로 대체됩니다.
 
 #### 로고와 상표
 
